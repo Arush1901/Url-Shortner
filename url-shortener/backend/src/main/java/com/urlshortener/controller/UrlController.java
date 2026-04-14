@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "*")
 public class UrlController {
 
     private final UrlService urlService;
@@ -31,7 +31,7 @@ public class UrlController {
         }
 
         Url saved = urlService.shortenUrl(originalUrl);
-        String baseUrl = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
+        String baseUrl = request.getRequestURL().toString().replace(request.getRequestURI(), "");
         String shortUrl = baseUrl + "/" + saved.getShortCode();
 
         return ResponseEntity.ok(Map.of("shortUrl", shortUrl));
