@@ -8,7 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @CrossOrigin(origins = "*")
@@ -30,19 +32,29 @@ public class UrlController {
             return ResponseEntity.badRequest().body(Map.of("error", "URL is required"));
         }
 
-        Url saved = urlService.shortenUrl(originalUrl);
-        String baseUrl = request.getRequestURL().toString().replace(request.getRequestURI(), "");
-        String shortUrl = baseUrl + "/" + saved.getShortCode();
+        String customCode = body.get("customCode");
 
-        return ResponseEntity.ok(Map.of("shortUrl", shortUrl));
+        try {
+            Url saved = urlService.shortenUrl(originalUrl, customCode);
+            String baseUrl = request.getRequestURL().toString().replace(request.getRequestURI(), "");
+            String shortUrl = baseUrl + "/" + saved.getShortCode();
+            return ResponseEntity.ok(Map.of("shortUrl", shortUrl));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @GetMapping("/{shortCode}")
-    public ResponseEntity<Void> redirect(@PathVariable String shortCode) {
-        Url url = urlService.incrementClickAndGet(shortCode);
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Location", url.getOriginalUrl());
-        return new ResponseEntity<>(headers, HttpStatus.FOUND);
+    public ResponseEntity<?> redirect(@PathVariable String shortCode) {
+        try {
+            Url url = urlService.incrementClickAndGet(shortCode);
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Location", url.getOriginalUrl());
+            return new ResponseEntity<>(headers, HttpStatus.FOUND);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 
     @GetMapping("/api/stats/{shortCode}")
@@ -56,4 +68,32 @@ public class UrlController {
                 )))
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @PutMapping("/api/toggle/{shortCode}")
+    public ResponseEntity<?> toggleActive(@PathVariable String shortCode) {
+        try {
+            Url url = urlService.toggleActive(shortCode);
+            return ResponseEntity.ok(Map.of(
+                    "shortCode", url.getShortCode(),
+                    "active", url.isActive()
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/api/all")
+    public ResponseEntity<List<Map<String, Object>>> getAllUrls() {
+        List<Map<String, Object>> result = urlService.getAllUrls().stream()
+                .map(url -> Map.<String, Object>of(
+                        "originalUrl", url.getOriginalUrl(),
+                        "shortCode", url.getShortCode(),
+                        "clickCount", url.getClickCount(),
+                        "createdAt", url.getCreatedAt().toString(),
+                        "active", url.isActive()
+                ))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
 }
+

@@ -4,6 +4,7 @@ import com.urlshortener.model.Url;
 import com.urlshortener.repository.UrlRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
@@ -21,7 +22,19 @@ public class UrlService {
     }
 
     public Url shortenUrl(String originalUrl) {
-        String shortCode = generateUniqueCode();
+        return shortenUrl(originalUrl, null);
+    }
+
+    public Url shortenUrl(String originalUrl, String customCode) {
+        String shortCode;
+        if (customCode != null && !customCode.isBlank()) {
+            if (urlRepository.existsByShortCode(customCode)) {
+                throw new IllegalArgumentException("Custom alias '" + customCode + "' is already taken.");
+            }
+            shortCode = customCode;
+        } else {
+            shortCode = generateUniqueCode();
+        }
         Url url = new Url();
         url.setOriginalUrl(originalUrl);
         url.setShortCode(shortCode);
@@ -35,8 +48,22 @@ public class UrlService {
     public Url incrementClickAndGet(String shortCode) {
         Url url = urlRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new RuntimeException("Short URL not found: " + shortCode));
+        if (!url.isActive()) {
+            throw new IllegalStateException("Link is disabled");
+        }
         url.setClickCount(url.getClickCount() + 1);
         return urlRepository.save(url);
+    }
+
+    public Url toggleActive(String shortCode) {
+        Url url = urlRepository.findByShortCode(shortCode)
+                .orElseThrow(() -> new RuntimeException("Short URL not found: " + shortCode));
+        url.setActive(!url.isActive());
+        return urlRepository.save(url);
+    }
+
+    public List<Url> getAllUrls() {
+        return urlRepository.findAll();
     }
 
     private String generateUniqueCode() {
