@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import axios from 'axios'
 
-const API_BASE = 'http://localhost:8080'
+const API_BASE = 'https://url-shortner-1-zynn.onrender.com'
 
 export default function App() {
   const [inputUrl, setInputUrl] = useState('')
